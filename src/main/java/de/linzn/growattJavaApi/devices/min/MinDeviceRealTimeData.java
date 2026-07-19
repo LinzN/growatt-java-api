@@ -10,13 +10,26 @@
  * or contact: niklas.linz@mirranet.de
  */
 
-package de.linzn.growattJavaApi.devices;
+package de.linzn.growattJavaApi.devices.min;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.linzn.growattJavaApi.BatteryState;
+import de.linzn.growattJavaApi.exceptions.GrowattApiException;
+import de.linzn.growattJavaApi.exceptions.GrowattDeviceNotFoundException;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MinDeviceData {
+public class MinDeviceRealTimeData {
 
     private int bmsSoc;
 
@@ -162,7 +175,7 @@ public class MinDeviceData {
         return edischargeTotal;
     }
 
-    public double getPowerOfGridTake(){
+    public double getPowerOfGridTake() {
         return powerOfGridTake;
     }
 
@@ -211,5 +224,57 @@ public class MinDeviceData {
         }
 
         return BatteryState.IDLE;
+    }
+
+    static MinDeviceRealTimeData call(String API_URL, String token, String serialNumber) throws GrowattApiException, GrowattDeviceNotFoundException {
+        HttpClient httpClient = HttpClient.newHttpClient();
+        ObjectMapper objectMapper = new ObjectMapper();
+        String formData = "pageNum=1" + "&tlxs=" + URLEncoder.encode(serialNumber, StandardCharsets.UTF_8);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(API_URL + "/v1/device/tlx/tlxs_data"))
+                .header("token", token)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(formData))
+                .build();
+
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(
+                    request,
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new GrowattApiException(e);
+        }
+
+        if (response.statusCode() != 200) {
+            throw new GrowattApiException("Growatt API Error: HTTP " + response.statusCode());
+        }
+
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(response.body());
+        } catch (JsonProcessingException e) {
+            throw new GrowattApiException(e);
+        }
+
+        if (root.path("error_code").asInt() != 0) {
+            throw new GrowattApiException("API Error: " + root.path("error_msg").asText());
+        }
+
+        JsonNode dataNode = root
+                .path("data")
+                .path(serialNumber)
+                .path(serialNumber);
+
+        if (dataNode.isMissingNode()) {
+            throw new GrowattDeviceNotFoundException("Device not found with this serial number: " + serialNumber);
+        }
+
+        try {
+            return objectMapper.treeToValue(dataNode, MinDeviceRealTimeData.class);
+        } catch (JsonProcessingException e) {
+            throw new GrowattApiException(e);
+        }
     }
 }
