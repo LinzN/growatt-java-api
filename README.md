@@ -2,6 +2,8 @@
 
 A lightweight Java library for connecting to the official [Growatt OpenAPI](https://openapi.growatt.com) to fetch live data from Growatt inverters and battery storage systems.
 
+This library is based on the [Growatt OpenAPI v1 documentation](https://www.showdoc.com.cn/262556420217021/6129830403882881). The v4 API is currently still buggy and inconsistent, so v1 is used instead.
+
 ## Supported device types
 
 Growatt's OpenAPI groups devices into several types:
