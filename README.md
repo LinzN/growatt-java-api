@@ -1,4 +1,4 @@
-# growatt-java-api
+# Growatt-Java-Api
 
 A lightweight Java library for connecting to the official [Growatt OpenAPI](https://openapi.growatt.com) to fetch live data from Growatt inverters and battery storage systems.
 
